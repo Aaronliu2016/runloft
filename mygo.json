@@ -1,0 +1,15 @@
+{
+  "name": "RunLoft",
+  "identifier": "io.github.aaronliu2016.runloft",
+  "version": "0.1.0",
+  "copyright": "Copyright 2026 Aaronliu",
+  "main": "./cmd/runloft",
+  "out": "dist",
+  "macos": {
+    "minimumSystemVersion": "14.0"
+  },
+  "windows": {
+    "companyName": "Aaronliu",
+    "productName": "RunLoft"
+  }
+}
