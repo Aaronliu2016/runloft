@@ -524,6 +524,9 @@ func (a *app) prepareProject(project workspace.Project) {
 		if !a.authorize(project, config, digest) {
 			return operationResult{message: "准备步骤已取消。"}
 		}
+		if err := a.revalidateApproval(project, digest); err != nil {
+			return operationResult{err: err}
+		}
 		err = runner.RunPrepare(ctx, project.Path, config, a.logLine)
 		if err != nil {
 			return operationResult{err: err}
@@ -543,6 +546,9 @@ func (a *app) startProject(project workspace.Project) {
 		}
 		if !a.authorize(project, config, digest) {
 			return operationResult{message: "启动已取消。"}
+		}
+		if err := a.revalidateApproval(project, digest); err != nil {
+			return operationResult{err: err}
 		}
 		result, err := runner.Start(ctx, project.Path, config, a.logLine)
 		if err != nil {
@@ -580,7 +586,10 @@ func (a *app) reviewConfig(project workspace.Project) (projectconfig.Config, str
 	}
 	repositoryStatus, err := a.git.Status(context.Background(), project.Path)
 	if err != nil {
-		return projectconfig.Config{}, "", fmt.Errorf("读取 Git 提交失败：%w", err)
+		return projectconfig.Config{}, "", fmt.Errorf("读取 Git 工作区状态失败：%w", err)
+	}
+	if !repositoryStatus.Clean() {
+		return projectconfig.Config{}, "", fmt.Errorf("工作区有 %d 项未提交改动；请先提交这些改动，再审查并运行项目", len(repositoryStatus.DirtyPaths))
 	}
 	repository := a.projectSource(project)
 	digest, err := config.ApprovalDigest(repository, repositoryStatus.Commit)
@@ -588,6 +597,17 @@ func (a *app) reviewConfig(project workspace.Project) (projectconfig.Config, str
 		return projectconfig.Config{}, "", err
 	}
 	return config, digest, nil
+}
+
+func (a *app) revalidateApproval(project workspace.Project, approvedDigest string) error {
+	_, currentDigest, err := a.reviewConfig(project)
+	if err != nil {
+		return err
+	}
+	if currentDigest != approvedDigest || !a.store.IsApproved(project.ID, currentDigest) {
+		return errors.New("项目提交或配置在审查后发生变化；请重新审查并授权")
+	}
+	return nil
 }
 
 func (a *app) projectSource(project workspace.Project) string {
