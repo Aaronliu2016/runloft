@@ -67,7 +67,7 @@
 - 实现本地 HTTP 健康检查、端口冲突处理和等待超时。
 - 就绪后才加载 WebView，并限制导航和外链行为。
 
-**验收状态：** 生命周期和 loopback 401 就绪测试通过；固定版 DeepSeek Harness 的容器 WebView 路径已单独验证。RunLoft 主应用接管真实 DSH 项目的完整闭环仍未在宿主机上验收，Windows 亦未验证。
+**验收状态：** 生命周期和 loopback 401 就绪测试通过；Unix 回归测试验证 leader 退出后会清理同组后台子进程且不影响另一进程组。固定版 DeepSeek Harness 的容器 WebView 路径已单独验证。RunLoft 主应用接管真实 DSH 项目的完整闭环仍未在宿主机上验收，Windows 亦未验证。
 
 ## P4：体验与分发
 
