@@ -38,6 +38,17 @@ RunLoft 面向已经能在开发者电脑上运行的本地 Web 应用。它不�
 
 当前一次只运行一个项目。每次打开项目 WebView 前会清除 MyGo 应用浏览数据，所以项目 Cookie 和本地存储不会跨次保留。
 
+## 系统要求
+
+首发目标平台为 macOS 14+（Apple Silicon）和 Windows 11 x64；Windows 实机运行及两平台的完整桌面验收仍在进行中。
+
+- macOS 使用系统自带的 WKWebView，无需另装浏览器内核。
+- Windows 需要系统已安装 WebView2 Runtime；RunLoft 安装包不捆绑 WebView2 Runtime。
+- Git 命令行工具必须可从 `PATH` 找到，供仓库克隆、状态检查、获取更新和快进更新使用。
+- 项目在 `.runloft.yaml` 中声明的运行时工具（例如 Node.js、pnpm）需要预先安装，并可供配置命令调用。RunLoft 只检查版本和可用性，不会安装或更新这些工具。
+
+实际平台验证状态与已知限制见[技术验证记录](docs/VALIDATION.md)。
+
 ## 开发
 
 需要 Go 1.27.1。MyGo CLI 已由 Go module 固定，macOS 上可在仓库根目录运行：

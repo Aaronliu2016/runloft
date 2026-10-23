@@ -6,7 +6,7 @@
 
 - **P0 部分完成，平台门槛未全部通过。** macOS Apple Silicon 上已验证 MyGo loopback WebView 的 HTTP、Cookie、JavaScript、WebSocket、SPA 路由和外链取消；DeepSeek Harness 固定 commit 在隔离容器中完成源码安装、构建和 tokenized WebView 页面验证。Windows 11 x64 的原生构建/运行、两平台完整目标项目闭环及主应用人工 GUI 验收仍未完成。证据见[技术验证记录](VALIDATION.md)。
 - **P1–P3 首版实现已进入仓库。** 当前包含 MyGo 原生项目列表、Git 工作区管理、严格配置校验、命令审查授权、版本诊断、prepare/start 生命周期、loopback 健康检查、日志遮盖、WebView 导航限制和进程停止。对应的单元测试已在 macOS 开发机通过；真实 Windows 与手动 GUI 验收仍待执行。
-- **P4 已准备打包入口，尚未通过发布验收。** macOS ARM64 `.app`/DMG 和 Windows x64 可执行文件、NSIS 安装器均已生成；GitHub draft release workflow 配置了同类构建，但 workflow 尚未运行。macOS Developer ID 签名/公证、Windows 安装器目标机测试、安装升级卸载及正式发布仍未完成。
+- **P4 已准备打包入口，尚未通过发布验收。** README 已记录目标平台、系统 WebView、Git 和项目运行时依赖。macOS ARM64 `.app`/DMG 和 Windows x64 可执行文件、NSIS 安装器均已生成；GitHub draft release workflow 配置了同类构建，但 workflow 尚未运行。macOS Developer ID 签名/公证、Windows 安装器目标机测试、安装升级卸载及正式发布仍未完成。
 
 阶段实现进度不代表该阶段验收门槛已通过；尤其 P0/P1 中两个首发平台的门槛仍是后续工作。
 
