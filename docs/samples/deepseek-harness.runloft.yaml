@@ -1,0 +1,43 @@
+schemaVersion: 1
+
+project:
+  name: DeepSeek Harness
+  description: Experimental local Web UI validation sample
+
+workingDirectory: .
+
+runtime:
+  checks:
+    - name: Node.js
+      command: node
+      version: ">=24.9.0"
+    - name: pnpm
+      command: pnpm
+      version: "=11.28.5"
+
+commands:
+  prepare:
+    steps:
+      - argv: [pnpm, install, --frozen-lockfile]
+      - argv: [pnpm, run, build]
+  start:
+    argv:
+      - pnpm
+      - dsh
+      - web
+      - --host
+      - 127.0.0.1
+      - --port
+      - "${RUNLOFT_PORT}"
+      - --public-url
+      - http://127.0.0.1:3080/
+      - --trusted-host
+      - 127.0.0.1:3080
+      - --no-open
+
+server:
+  host: 127.0.0.1
+  port: 3080
+  healthPath: /
+  readyTimeoutSeconds: 120
+  entryURLRegex: 'dsh web: (http://127\.0\.0\.1:3080/\?token=[^ ]+)'

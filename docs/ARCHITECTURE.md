@@ -25,7 +25,7 @@ flowchart LR
 
 ### 项目管理器
 
-保存本地项目元数据，定位工作区，读取与校验 `.runloft.yaml`，协调更新和生命周期状态。用户数据应保存在操作系统提供的应用数据目录，不应写进目标项目仓库。
+保存本地项目元数据，定位工作区，读取与校验 `.runloft.yaml`，协调更新和生命周期状态。项目登记、远端来源和配置授权摘要存放在操作系统提供的应用数据目录，不写进目标项目仓库。移除项目只清除登记，不删除代码工作区。
 
 ### Git 适配器
 
@@ -33,11 +33,11 @@ flowchart LR
 
 ### 命令执行器
 
-以项目根目录为基准运行配置命令；准备步骤按序执行，逐步收集标准输出和错误输出并记录退出码与进程状态。应能停止由 RunLoft 启动的整组进程，而不是只结束最外层命令。
+在解析并校验工作目录后运行配置命令；准备步骤按序执行，逐步收集标准输出和错误输出并记录退出码与进程状态。命令通过 argv 数组执行，不经过 shell。Unix 为每个目标命令创建独立进程组；Windows 将目标进程放入关闭时终止成员的 Job Object，并用 `taskkill /T` 发起优雅停止。Windows 设备上的运行行为仍待验证。
 
 ### 服务探测与 WebView
 
-服务探测器轮询配置的本地健康地址。健康检查通过后，窗口再加载 WebView。WebView 只允许进入配置的 loopback 服务；外部链接交由系统浏览器处理。
+服务探测器轮询配置的 loopback 健康地址。健康检查只接受 2xx、401、403，不跟随重定向；若项目从日志中动态打印入口 URL，RunLoft 需校验它与配置的 loopback origin/port 一致后再加载 WebView。用户主动触发的跨域 HTTP(S) 导航在校验 URL 凭据并移除敏感查询参数和片段后交给系统浏览器；`target="_blank"` 和 `window.open` 请求先经原生确认，再由用户选择是否打开。
 
 ## 3. 项目状态
 
@@ -54,7 +54,7 @@ stateDiagram-v2
     WaitingForHTTP --> Running: 健康检查通过
     WaitingForHTTP --> Error: 超时或进程退出
     Running --> Stopping: 停止或应用退出
-    Stopping --> Ready: 进程组退出
+    Stopping --> Ready: 主进程退出并完成清理请求
     Stopping --> Error: 清理超时
     Error --> Ready: 用户重试或修复
 ```
@@ -63,13 +63,15 @@ stateDiagram-v2
 
 ## 4. 启动流程
 
-1. 解析仓库配置并校验 schema 版本、工作目录、命令和本地 URL。
-2. 计算配置摘要；从未授权或摘要改变时，展示命令和目录供用户审查。
-3. 检查本机依赖和端口可用性。RunLoft 只诊断运行时，不自动安装或更新；缺少时提示用户。`prepare.steps` 只能由用户主动触发，按序执行；任一步失败即停止，不在 clone 或每次启动时静默执行。
-4. 在目标仓库目录启动子进程，继承必要环境并添加 RunLoft 定义的变量。
-5. 缓冲并显示日志；在超时范围内轮询 HTTP 健康检查。
-6. 健康检查成功后，让 MyGo WebView 加载配置的 loopback URL。
-7. 停止时先请求优雅退出；超时后结束由 RunLoft 创建的进程组，并确认端口释放。
+1. 检查 Git 工作区是否干净；存在未提交或非忽略的未跟踪文件时停止并提示先提交。
+2. 解析仓库配置并校验 schema 版本、工作目录、命令和本地 URL；把仓库身份、HEAD commit 和解析配置绑定到授权摘要。
+3. 执行配置声明的白名单运行时版本探针；探针使用固定参数且在命令授权对话框前运行。RunLoft 不自动安装或更新运行时。
+4. 若当前摘要尚未授权，展示命令和目录供用户审查；用户确认后再次检查提交、配置和工作区状态，变化时取消执行。
+5. `prepare.steps` 只能由用户主动触发，按序执行；任一步失败即停止，不在 clone 或每次启动时静默执行。启动前检查端口可用性。
+6. 在目标仓库目录启动子进程，继承 RunLoft 的完整环境并设置 `RUNLOFT_PORT`。
+7. 缓冲并显示日志；在超时范围内轮询 HTTP 健康检查。
+8. 健康检查成功后，让 MyGo WebView 加载配置的 loopback URL。
+9. 停止时先请求优雅退出；超时后向 RunLoft 创建的进程组/Job Object 请求强制清理，并等待主进程退出。当前不会单独确认每个后代进程均已结束。
 
 ## 5. Git 更新流程
 
@@ -87,17 +89,18 @@ stateDiagram-v2
 - MVP 优先使用仓库配置中的固定端口，并检查端口冲突。动态端口分配要等目标项目能可靠接收并报告端口后再设计。
 - WebView 加载前必须完成就绪检查；启动命令保持运行并不代表 HTTP 服务已就绪。
 - 校验 URL 的 scheme、host 和 port；拒绝任意远程地址、文件 URL 和配置目录之外的跳转。
-- Cookie、localStorage 和 WebView profile 的隔离策略需在技术验证阶段确定，避免不同仓库之间共享认证状态。
+- MyGo 0.6.0 提供应用级浏览数据清理，没有为本项目配置独立 WebView profile 的接口。RunLoft 在每次打开目标页面前清理 MyGo 应用浏览数据，以防不同仓库共享状态；因此项目 Cookie/localStorage 不跨次保留。
+- 一个 RunLoft 实例当前只允许一个活动项目，先停止当前项目才能切换工作区。
 
 ## 7. 技术边界与验证项
 
-当前方向为 Go + MyGo。MyGo 提供使用系统 WebView 的桌面窗口能力；它的文档还指出，非应用自有网页不能调用 Go 绑定。因此，目标项目页面与 RunLoft 的本机控制能力应分离：RunLoft 控制命令和生命周期，目标页面通过本机 HTTP 服务提供自身功能。
+当前方向为 Go + MyGo 0.6.0。MyGo 提供使用系统 WebView 的桌面窗口能力；非应用自有网页不能调用 Go 绑定。因此，目标项目页面与 RunLoft 的本机控制能力分离：RunLoft 控制命令和生命周期，目标页面通过本机 HTTP 服务提供自身功能。`cmd/runloft` 已接入本机工作区列表、Git、配置授权、版本诊断、prepare/start/stop 和服务 WebView；具体平台验收结果以[技术验证记录](VALIDATION.md)为准。
 
-实现前必须验证：
+实现后仍需完成的平台与人工验证：
 
-- MyGo WebView 能否可靠加载 `http://127.0.0.1:<port>` 并处理项目常见的 cookie、WebSocket、重定向和前端路由。
-- 在 Windows 11 x64 与 macOS 14+（Apple Silicon）上关闭窗口、应用退出、崩溃恢复时对子进程的清理行为。
-- 多项目之间的 WebView 存储隔离、外链处理和浏览器开发工具策略。
-- 系统 Git 与命令进程在首发平台上的进程树终止实现。
+- macOS Apple Silicon 的最小 WebView 已验证 HTTP、Cookie、WebSocket 和 SPA 路由；Windows 11 x64 与完整 RunLoft 主应用仍需验证 loopback、重定向及项目页面行为。
+- 在 Windows 11 x64 与 macOS 14+（Apple Silicon）上人工验收窗口关闭、应用退出时对子进程的清理行为；Windows Job Object 实现尚无目标设备实测。
+- WebView 数据目前在加载项目前清除应用级浏览数据；需继续人工验收项目间隔离、外链/新窗口确认和浏览器开发工具策略。
+- 系统 Git 与命令进程的进程组/Job Object 清理请求已实现；后代进程结束状态不单独确认，首发平台实机验收及 Linux 行为仍待确认。
 
 参考： [MyGo Getting started](https://mygo.egoist.dev/docs/getting-started)、[MyGo Web view](https://mygo.egoist.dev/docs/ui/web-view)、[MyGo Building and distributing](https://mygo.egoist.dev/docs/distribution)。

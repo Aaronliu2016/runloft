@@ -2,6 +2,14 @@
 
 此计划按风险和依赖顺序推进。每阶段先产出可审查结果，再进入下一阶段；本文不预设具体日历日期。
 
+## 执行状态（2026-10-24）
+
+- **P0 部分完成，平台门槛未全部通过。** macOS Apple Silicon 上已验证 MyGo loopback WebView 的 HTTP、Cookie、JavaScript、WebSocket、SPA 路由和外链取消；DeepSeek Harness 固定 commit 在隔离容器中完成源码安装、构建和 tokenized WebView 页面验证。Windows 11 x64 的原生构建/运行、两平台完整目标项目闭环及主应用人工 GUI 验收仍未完成。证据见[技术验证记录](VALIDATION.md)。
+- **P1–P3 首版实现已进入仓库。** 当前包含 MyGo 原生项目列表、Git 工作区管理、严格配置校验、命令审查授权、版本诊断、prepare/start 生命周期、loopback 健康检查、日志遮盖、WebView 导航限制和进程停止。对应的单元测试已在 macOS 开发机通过；真实 Windows 与手动 GUI 验收仍待执行。
+- **P4 已准备打包入口，尚未通过发布验收。** macOS ARM64 `.app`/DMG 和 Windows x64 可执行文件、NSIS 安装器均已生成；GitHub draft release workflow 配置了同类构建，但 workflow 尚未运行。macOS Developer ID 签名/公证、Windows 安装器目标机测试、安装升级卸载及正式发布仍未完成。
+
+阶段实现进度不代表该阶段验收门槛已通过；尤其 P0/P1 中两个首发平台的门槛仍是后续工作。
+
 ## P0：方案收敛与技术验证
 
 **目标：** 尽早验证桌面 WebView、本地服务和子进程的组合可行。
@@ -13,12 +21,12 @@
 - 验证 HTTP/WebSocket、Cookie、前端路由、外链拦截和本地服务未就绪提示。
 - 从桌面应用启动和停止一个目标进程；验证关闭应用后的进程清理。
 - 验证系统 Git 对公开仓库的 clone、status、fetch 和安全快进更新。
-- 审阅 `.runloft.yaml` 草案、用户信任流程和固定端口方案；验证样本仓库须固定到具体 commit，并先审阅其 `SAFETY.md`。
-- 按仓库 README 的源码流程验证 `pnpm install`、`pnpm run build`、`pnpm dsh web`；检查时根 `package.json` 声明 Node.js `>=24.9.0`、pnpm `11.28.5`。README 记载 npm 运行方式默认监听 `127.0.0.1:3080`；源码方式的实际监听地址、健康检查路径及两平台兼容性仍须实测。
+- 审阅 `.runloft.yaml` 草案、用户信任流程和固定端口方案；DeepSeek Harness 样本已固定到具体 commit 并审阅 `SAFETY.md`。仍须在两平台完成宿主机和 RunLoft 主应用闭环验证。
+- 按仓库 README 的源码流程验证 `pnpm install --frozen-lockfile`、`pnpm run build`、`pnpm dsh web`；根 `package.json` 声明 Node.js `>=24.9.0`、pnpm `11.28.5`。容器内实测源码入口为 `dsh web: http://127.0.0.1:<port>/?token=…`，`/` 的未授权响应为 401；配置样例显式绑定 loopback 并提取 token 入口 URL。该结果仅覆盖隔离容器，不代表宿主机两平台均已兼容。
 
 **交付物：** 技术验证记录、决策更新、Windows/macOS 首发支持矩阵和 MVP 验收用例。
 
-**进入下一阶段的门槛：** MyGo WebView 在 Windows 11 x64 和 macOS 14+（Apple Silicon）均能稳定加载 loopback 服务；两个平台的子进程均能被停止并清理；关键跨平台或安全障碍有明确方案。若任一平台不满足，应重新评估框架或缩小 MVP。
+**验收状态：未完全通过。** macOS Apple Silicon 的最小 WebView 和隔离样本验证通过；Windows 11 x64 原生运行、目标进程树清理、桌面主应用人工交互尚待验证。当前按 MyGo + Unix 进程组 / Windows Job Object 与 `taskkill /T` 继续实现；在 Windows 设备完成验收前不宣称 P0 关闭。
 
 ## P1：可启动的桌面骨架
 
@@ -33,7 +41,7 @@
 
 **交付物：** 能启动的开发版外壳及开发说明。
 
-**验收门槛：** 应用在 Windows 11 x64 和 macOS 14+（Apple Silicon）启动，能打开测试 loopback 页面并显示网络错误状态。
+**验收状态：** Go/MyGo 开发版可构建，UI 源码已实现；本机 WebView 技术验证已记录。RunLoft 主 UI 的可交互验收和 Windows 11 x64 启动/错误状态测试仍待完成。
 
 ## P2：仓库与配置
 
@@ -46,7 +54,7 @@
 - 展示仓库来源、工作区状态、配置命令和配置摘要。
 - 实现命令预览、首次授权以及配置变化后的重新授权。
 
-**验收门槛：** 无效配置不会进入执行流程；有本地变更时更新被阻止且原因清楚。
+**验收状态：** 已实现并有自动测试覆盖无效配置拒绝、配置授权摘要变化、脏工作区阻止更新以及过期更新计划拒绝。主 UI 交互仍需手动验收。
 
 ## P3：进程生命周期与服务呈现
 
@@ -59,7 +67,7 @@
 - 实现本地 HTTP 健康检查、端口冲突处理和等待超时。
 - 就绪后才加载 WebView，并限制导航和外链行为。
 
-**验收门槛：** 一个真实项目从克隆开始可以完成安装、启动、就绪、显示、停止的闭环。
+**验收状态：** 生命周期和 loopback 401 就绪测试通过；固定版 DeepSeek Harness 的容器 WebView 路径已单独验证。RunLoft 主应用接管真实 DSH 项目的完整闭环仍未在宿主机上验收，Windows 亦未验证。
 
 ## P4：体验与分发
 
@@ -77,7 +85,7 @@
 ## 建议的首批交付顺序
 
 1. P0：MyGo loopback WebView + 子进程验证。
-2. P0：在 Windows/macOS 验证 DeepSeek Harness Web UI 路径，固定样本 commit 并确认配置草案。
+2. P0：已记录 DeepSeek Harness 固定 commit、配置草案和隔离容器 Web UI 结果；后续在 Windows/macOS 完成 RunLoft 主应用宿主机闭环。
 3. P1：桌面骨架与手工添加本地项目。
 4. P2：配置读取、授权与 Git clone/status。
 5. P3：启动/就绪/停止闭环，再增加安全更新。
@@ -86,7 +94,7 @@
 ## 已确定的决策
 
 - 首发平台范围：Windows 11 x64、macOS 14+（仅 Apple Silicon）；不承诺 Windows 10/ARM、Intel Mac 或更旧 macOS。仍需在 P0 验证 MyGo 对该范围的实际支持。
-- 验证样本：[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的 Web UI 模式；固定 commit、实际监听/健康检查地址、Node/pnpm 依赖准备方式及两平台兼容性仍待 P0 实测。
+- 验证样本：[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的 Web UI 模式；固定 commit、隔离容器中的监听/健康检查入口及 Node/pnpm 源码准备流程已记录。RunLoft 主应用完整闭环，以及 Windows 11 x64 和 macOS 14+ Apple Silicon 的宿主机兼容性仍待 P0 实测。
 - Git 更新：用户主动检查时才 fetch；展示目标提交后，只有用户明确确认才应用快进更新。工作区不干净或分支分叉时阻止更新。
 - 配置准备步骤：使用 `commands.prepare.steps` 按序执行；失败即停止，必须由用户主动触发。
 - 运行时依赖：MVP 只诊断本机工具及版本并提示用户，不自动安装或更新运行时；项目依赖仍通过经授权的准备步骤处理。
@@ -96,5 +104,6 @@
 
 ## 后续落实事项
 
-- P0 固定 DeepSeek Harness 验证 commit，并实测源码模式的监听地址、健康检查路径和 Windows/macOS 兼容性。
+- P0 已固定 DeepSeek Harness 验证 commit，并记录隔离容器的监听地址、健康检查和 token 入口；仍须在 Windows 11 x64 与 macOS 14+ Apple Silicon 完成主应用实机验收。
+- 已从 macOS 成功交叉构建 Windows x64 可执行文件，并在一次性 Debian/NSIS 容器中生成安装器。后续仍须在 Windows 11 x64 上启动应用及执行安装、升级、卸载验收。
 - 在 P4 macOS 公开发布前申请个人 Apple Developer 账号；Windows Authenticode 是否采购按预算执行，无预算时允许未签名首发。

@@ -1,0 +1,44 @@
+# 技术验证记录
+
+最后更新：2026-10-24
+
+本文记录本项目 P0 样本、桌面框架和当前代码验证结果。标注为“未验证”的平台或行为不应被理解为已支持。
+
+## P0 样本与隔离方式
+
+- 样本仓库：[`deepseek-ai/deepseek-harness`](https://github.com/deepseek-ai/deepseek-harness)，固定 commit `22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。
+- 审阅了该 commit 的 `SAFETY.md`。项目自述为未经安全审计的开发预览，可执行生成代码、插件和命令，并访问进程、网络、凭据及文件；因此本次源码安装、构建和运行均在一次性 Docker 容器中完成，没有挂载主机用户目录或凭据。
+- 容器内按仓库源码方式执行 `pnpm install --frozen-lockfile`、`pnpm run build` 和 `pnpm dsh web`。构建门禁结果为 10 passed、0 failed、0 skipped。
+- DSH 服务在容器内绑定地址上运行，并通过 `127.0.0.1:13080` 映射给宿主机。未携带启动 token 的根路径请求返回 HTTP 401；MyGo WebView 加载携带 token 的实际页面后显示标题 `DSH 本地构建`，页面 origin 为 `http://127.0.0.1:13080`。
+- 从该 WebView 尝试打开 `https://example.com` 时触发导航拦截回调并取消导航。
+- 另一个最小 MyGo 页面验证了 HTTP 200、Cookie、JavaScript、WebSocket 和 SPA 路由切换。该验证在 macOS Apple Silicon 上执行。
+
+## 当前代码验证
+
+下表记录的是 2026-10-24 本轮已执行的检查。之后新增的原生新窗口确认、干净工作区门禁和授权后复核尚未重新运行 Go 测试或 vet；这些改动已由 reviewer 检查，并通过暂存差异空白检查。
+
+| 项目 | 结果 | 证据与边界 |
+| --- | --- | --- |
+| Go 项目与 MyGo 依赖 | 已验证 | 使用 Go 1.27.1、MyGo v0.6.0；`go test ./...`、`go vet ./...`、`go tool mygo vet .` 在 macOS Apple Silicon 上通过。 |
+| 严格配置校验与授权摘要 | 已验证 | 单元测试覆盖未知字段、额外 YAML 文档、目录逃逸、运行时探针白名单、入口 URL 来源及仓库/commit/配置变化导致的授权摘要变化。 |
+| Git 安全快进逻辑 | 已验证 | 临时本地仓库测试覆盖干净快进、脏工作区阻止更新、分叉阻止更新和过期计划拒绝。 |
+| 进程与 HTTP 就绪流程 | 已验证 | 本机测试子进程覆盖启动、401 健康检查、令牌 URL 捕获、日志秘密遮盖、超长输出行持续排空、端口占用和 prepare 失败即停止。Windows Job Object 清理尚未在目标 Windows 设备实测。 |
+| 目标 DSH Web UI | 已验证（隔离容器） | 固定 commit 的源码构建与 tokenized WebView 页面成功。尚未由 RunLoft 主应用在宿主机运行该未审计项目。 |
+| macOS 14+ Apple Silicon 完整 GUI 验收 | 部分验证 | 当前开发机可运行 MyGo 与最小 WebView 验证；桌面处于锁屏状态，未完成对 RunLoft 主界面的人工交互验收。 |
+| macOS Apple Silicon 应用包 | 已构建并检查 | MyGo 生成了 ARM64 `.app` 与 DMG；`codesign --verify --deep --strict` 和 `hdiutil verify` 通过，最低系统版本为 macOS 14.0。该包使用 ad-hoc 签名，未公证；没有完成可交互桌面中的 RunLoft 人工验收。 |
+| Windows x64 构建与安装器 | 已构建并检查 | `GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build ./...` 通过；MyGo v0.6.0 生成了 Windows x64 应用和 NSIS 安装器。安装器在一次性 Debian 容器中生成，文件类型识别为 Nullsoft Installer；尚未在 Windows 上运行。 |
+| CI 与 draft release workflow | 已准备，未执行 | CI 配置了测试、Go/MyGo vet 和 Windows 交叉编译；打 tag 后的 draft release workflow 配置了 macOS DMG 与 Windows 安装器构建。尚无 workflow run 结果或已上传的发布产物。 |
+| Windows 11 x64 运行 | 未验证 | 当前开发机为 macOS；尚无 Windows 11 x64 实机运行环境。WebView2、启动和停止进程树、安装器及安装/升级/卸载行为仍待在目标设备验收。 |
+
+## DeepSeek Harness 示例配置
+
+[`samples/deepseek-harness.runloft.yaml`](samples/deepseek-harness.runloft.yaml) 是该固定样本的配置模板，按其源码说明声明 Node.js `>=24.9.0`、pnpm `11.28.5`，先执行 frozen install 和 build，再以 `127.0.0.1:3080` 启动 Web UI。该配置不会自动运行：用户必须在 RunLoft 中单独审查并授权 prepare 或 start 命令。
+
+DSH 的 token 在启动日志 URL 中传递给 WebView。RunLoft 只在内存中使用该入口 URL；日志遮盖 URL 查询令牌和从敏感环境变量读取的值。根路径返回 401 被视为服务存活，因为 DSH 只有在入口 URL 携带启动 token 时才允许访问页面。
+
+## 后续验证
+
+1. 在 macOS 14+ Apple Silicon 上使用可交互桌面会话运行 RunLoft，完成添加、授权、准备、WebView、停止和重开项目的人工验收。
+2. 在 Windows 11 x64 上运行交叉构建的 RunLoft，确认 WebView2、外链策略、loopback Cookie/WebSocket 和子进程树停止行为；运行已生成的 NSIS 安装器并验证安装、升级和卸载。
+3. 在两平台分别使用 DeepSeek Harness 的固定 commit 完成完整闭环；除非继续放在隔离环境内，否则不要对该样本提供主机凭据或敏感目录访问。
+4. 验证签名安装包、升级和卸载，再进入 P4 发布准备。
