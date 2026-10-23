@@ -22,6 +22,7 @@
 | Go 项目与 MyGo 依赖 | 已验证 | 使用 Go 1.27.1、MyGo v0.6.0；针对当前提交运行 `make test`、`make vet` 均通过。 |
 | 严格配置校验与授权摘要 | 已验证 | 单元测试覆盖未知字段、额外 YAML 文档、目录逃逸、运行时探针白名单、入口 URL 来源及仓库/commit/配置变化导致的授权摘要变化。 |
 | Git 安全快进逻辑 | 已验证 | 临时本地仓库测试覆盖干净快进、脏工作区阻止更新、分叉阻止更新和过期计划拒绝。 |
+| 公开仓库 Git 适配器流程 | 已验证（临时克隆） | RunLoft 的 `gitops.Git` 对公开 RunLoft 仓库执行 clone 和干净状态检查；将临时克隆切换到前一提交后，`CheckUpdates` 成功 fetch 并生成 `ahead=0, behind=1` 的计划，`FastForward` 将本地分支安全更新到目标提交 `614e3b2`，工作区保持干净。该验证未推送或修改远端；脏工作区、分叉和过期计划由本地仓库测试覆盖。 |
 | 进程与 HTTP 就绪流程 | 已验证 | 本机测试子进程覆盖启动、401 健康检查、令牌 URL 捕获、日志秘密遮盖、超长输出行持续排空、端口占用和 prepare 失败即停止。Unix 回归测试还验证了 leader 退出后会清理同一进程组的后台子进程，且不影响另一进程组；Windows Job Object 清理尚未在目标 Windows 设备实测。 |
 | 目标 DSH Web UI | 已验证（隔离容器） | 固定 commit 的源码构建与 tokenized WebView 页面成功。尚未由 RunLoft 主应用在宿主机运行该未审计项目。 |
 | macOS 14+ Apple Silicon 完整 GUI 验收 | 部分验证 | 当前开发机可运行 MyGo 与最小 WebView 验证；桌面处于锁屏状态，未完成对 RunLoft 主界面的人工交互验收。 |
