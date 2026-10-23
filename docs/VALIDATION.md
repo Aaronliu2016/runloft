@@ -15,18 +15,18 @@
 
 ## 当前代码验证
 
-下表记录的是 2026-10-24 本轮已执行的检查。之后新增的原生新窗口确认、干净工作区门禁和授权后复核尚未重新运行 Go 测试或 vet；这些改动已由 reviewer 检查，并通过暂存差异空白检查。
+截至 2026-10-24，本轮已针对当前提交重新运行 Go 测试、Go/MyGo vet、Windows x64 交叉编译，并重建两平台应用包。主应用 GUI、Windows 实机和安装器交互仍未验收。
 
 | 项目 | 结果 | 证据与边界 |
 | --- | --- | --- |
-| Go 项目与 MyGo 依赖 | 已验证 | 使用 Go 1.27.1、MyGo v0.6.0；`go test ./...`、`go vet ./...`、`go tool mygo vet .` 在 macOS Apple Silicon 上通过。 |
+| Go 项目与 MyGo 依赖 | 已验证 | 使用 Go 1.27.1、MyGo v0.6.0；针对当前提交运行 `make test`、`make vet` 均通过。 |
 | 严格配置校验与授权摘要 | 已验证 | 单元测试覆盖未知字段、额外 YAML 文档、目录逃逸、运行时探针白名单、入口 URL 来源及仓库/commit/配置变化导致的授权摘要变化。 |
 | Git 安全快进逻辑 | 已验证 | 临时本地仓库测试覆盖干净快进、脏工作区阻止更新、分叉阻止更新和过期计划拒绝。 |
 | 进程与 HTTP 就绪流程 | 已验证 | 本机测试子进程覆盖启动、401 健康检查、令牌 URL 捕获、日志秘密遮盖、超长输出行持续排空、端口占用和 prepare 失败即停止。Windows Job Object 清理尚未在目标 Windows 设备实测。 |
 | 目标 DSH Web UI | 已验证（隔离容器） | 固定 commit 的源码构建与 tokenized WebView 页面成功。尚未由 RunLoft 主应用在宿主机运行该未审计项目。 |
 | macOS 14+ Apple Silicon 完整 GUI 验收 | 部分验证 | 当前开发机可运行 MyGo 与最小 WebView 验证；桌面处于锁屏状态，未完成对 RunLoft 主界面的人工交互验收。 |
-| macOS Apple Silicon 应用包 | 已构建并检查 | MyGo 生成了 ARM64 `.app` 与 DMG；`codesign --verify --deep --strict` 和 `hdiutil verify` 通过，最低系统版本为 macOS 14.0。该包使用 ad-hoc 签名，未公证；没有完成可交互桌面中的 RunLoft 人工验收。 |
-| Windows x64 构建与安装器 | 已构建并检查 | `GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build ./...` 通过；MyGo v0.6.0 生成了 Windows x64 应用和 NSIS 安装器。安装器在一次性 Debian 容器中生成，文件类型识别为 Nullsoft Installer；尚未在 Windows 上运行。 |
+| macOS Apple Silicon 应用包 | 已构建并检查 | 针对当前提交重新生成 ARM64 `.app` 与 DMG；`codesign --verify --deep --strict` 和 `hdiutil verify` 均通过，最低系统版本为 macOS 14.0。该包使用 ad-hoc 签名，未公证；没有完成可交互桌面中的 RunLoft 人工验收。 |
+| Windows x64 构建与安装器 | 已构建并检查 | 针对当前提交运行 `GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build ./...` 与 `make build-windows-x64` 均通过。MyGo 在一次性 Debian/NSIS 容器中生成 Windows x64 应用和安装器；`file` 将应用识别为 PE32+ x86-64，将安装器识别为 Nullsoft Installer。两者尚未在 Windows 上运行。 |
 | CI 与 draft release workflow | 已准备，未执行 | CI 配置了测试、Go/MyGo vet 和 Windows 交叉编译；打 tag 后的 draft release workflow 配置了 macOS DMG 与 Windows 安装器构建。尚无 workflow run 结果或已上传的发布产物。 |
 | Windows 11 x64 运行 | 未验证 | 当前开发机为 macOS；尚无 Windows 11 x64 实机运行环境。WebView2、启动和停止进程树、安装器及安装/升级/卸载行为仍待在目标设备验收。 |
 

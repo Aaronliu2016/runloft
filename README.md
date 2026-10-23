@@ -14,7 +14,7 @@ RunLoft 计划提供一个桌面入口：从 Git 仓库获取 Web 项目，按�
 4. 查看项目的 RunLoft 配置并授权其中的命令。
 5. 按需执行项目声明的准备步骤（如安装依赖、构建），然后启动项目。
 6. 等待本地 HTTP 服务就绪，并在桌面窗口中打开。
-7. 停止项目或退出 RunLoft 时，关闭由 RunLoft 管理的进程。
+7. 停止项目或退出 RunLoft 时，RunLoft 会尝试清理其启动的进程及子进程；每个后代进程的最终退出状态不单独确认。
 
 RunLoft 面向已经能在开发者电脑上运行的本地 Web 应用。它不会重写项目界面，也不会悄悄替换项目现有的构建和运行工具链。
 
@@ -60,6 +60,10 @@ make build-windows-x64
 添加项目后，先选择“准备依赖”或“启动项目”并审查命令授权。RunLoft 不会在克隆、启动应用或打开项目列表时自动执行仓库命令。
 
 示例项目配置见 [`docs/samples/deepseek-harness.runloft.yaml`](docs/samples/deepseek-harness.runloft.yaml)。该样本仓库是未经安全审计的实验性开发预览；使用前请阅读其安全说明，并在隔离环境中运行。更多实现状态与平台限制见[推进计划](docs/ROADMAP.md)和[验证记录](docs/VALIDATION.md)。
+
+## 问题与反馈
+
+请在 [GitHub Issues](https://github.com/Aaronliu2016/runloft/issues) 提交错误报告或功能建议。报告问题时可附上 RunLoft 版本、操作系统和已脱敏的相关日志；不要提交令牌、凭据或敏感环境变量。
 
 ## 许可证
 
