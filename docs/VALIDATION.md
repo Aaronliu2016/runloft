@@ -33,7 +33,7 @@
 
 ## DeepSeek Harness 示例配置
 
-[`samples/deepseek-harness.runloft.yaml`](samples/deepseek-harness.runloft.yaml) 是该固定样本的配置模板，按其源码说明声明 Node.js `>=24.9.0`、pnpm `11.28.5`，先执行 frozen install 和 build，再以 `127.0.0.1:3080` 启动 Web UI。该配置不会自动运行：用户必须在 RunLoft 中单独审查并授权 prepare 或 start 命令。
+[`samples/deepseek-harness.runloft.yaml`](samples/deepseek-harness.runloft.yaml) 是该固定样本的配置模板，可从 RunLoft 应用导入并保存在应用数据中。它按样本源码说明声明 Node.js `>=24.9.0`、pnpm `11.28.5`，先执行 frozen install 和 build，再以 `127.0.0.1:3080` 启动 Web UI。该配置不会自动运行：用户必须在 RunLoft 中单独审查并授权 prepare 或 start 命令。
 
 DSH 的 token 在启动日志 URL 中传递给 WebView。RunLoft 只在内存中使用该入口 URL；日志遮盖 URL 查询令牌和从敏感环境变量读取的值。根路径返回 401 被视为服务存活，因为 DSH 只有在入口 URL 携带启动 token 时才允许访问页面。
 

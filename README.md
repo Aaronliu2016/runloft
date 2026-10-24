@@ -10,8 +10,8 @@ RunLoft 计划提供一个桌面入口：从 Git 仓库获取 Web 项目，按�
 
 1. 添加 Git 仓库并选择本地工作区。
 2. 克隆仓库，或为已有的干净工作区获取更新。
-3. 为了让授权对应可审查的源码，只能在 Git 工作区干净时运行；先提交本地改动。
-4. 查看项目的 RunLoft 配置并授权其中的命令。
+3. 为了让授权对应可审查的源码，运行前须提交或移除本地改动。
+4. 在 RunLoft 中导入或填写项目运行配置，并审查授权其中的命令。
 5. 按需执行项目声明的准备步骤（如安装依赖、构建），然后启动项目。
 6. 等待本地 HTTP 服务就绪，并在桌面窗口中打开。
 7. 停止项目或退出 RunLoft 时，RunLoft 会尝试清理其启动的进程及子进程；每个后代进程的最终退出状态不单独确认。
@@ -23,7 +23,7 @@ RunLoft 面向已经能在开发者电脑上运行的本地 Web 应用。它不�
 - [文档索引](docs/README.md)
 - [项目方案与范围](docs/PROJECT_PLAN.md)
 - [架构与生命周期](docs/ARCHITECTURE.md)
-- [仓库配置草案](docs/PROJECT_CONFIG.md)
+- [项目运行配置](docs/PROJECT_CONFIG.md)
 - [推进计划与交付门槛](docs/ROADMAP.md)
 - [安全模型](docs/SECURITY.md)
 
@@ -31,8 +31,8 @@ RunLoft 面向已经能在开发者电脑上运行的本地 Web 应用。它不�
 
 - 使用系统 WebView 展示 loopback Web 应用。
 - 添加本地 Git 工作区或克隆仓库；查看 Git 状态，并在工作区干净且用户确认后应用快进更新。
-- 严格读取 `.runloft.yaml`，审查并授权命令；prepare 与 start 都由用户分别主动触发。
-- 只在 Git 工作区干净时执行 prepare/start，并在执行前再次核对授权对应的提交和配置。
+- 在 RunLoft 应用数据中管理每个项目的运行配置，不要求改动目标仓库；配置经校验后审查并授权，prepare 与 start 都由用户分别主动触发。
+- 只在 Git 工作区干净时执行 prepare/start，并在执行前再次核对授权对应的提交和应用内配置。
 - 诊断配置声明的本机运行时，按序执行准备步骤，启动服务并等待 HTTP 就绪。
 - 显示经过秘密遮盖的运行日志，限制 WebView 导航，并尝试停止 RunLoft 创建的进程及其子进程。
 
@@ -45,7 +45,7 @@ RunLoft 面向已经能在开发者电脑上运行的本地 Web 应用。它不�
 - macOS 使用系统自带的 WKWebView，无需另装浏览器内核。
 - Windows 需要系统已安装 WebView2 Runtime；RunLoft 安装包不捆绑 WebView2 Runtime。
 - Git 命令行工具必须可从 `PATH` 找到，供仓库克隆、状态检查、获取更新和快进更新使用。
-- 项目在 `.runloft.yaml` 中声明的运行时工具（例如 Node.js、pnpm）需要预先安装，并可供配置命令调用。RunLoft 只检查版本和可用性，不会安装或更新这些工具。
+- 项目配置声明的运行时工具（例如 Node.js、pnpm）需要预先安装，并可供配置命令调用。RunLoft 只检查版本和可用性，不会安装或更新这些工具。
 
 实际平台验证状态与已知限制见[技术验证记录](docs/VALIDATION.md)。
 
@@ -70,7 +70,7 @@ make build-windows-x64
 
 添加项目后，先选择“准备依赖”或“启动项目”并审查命令授权。RunLoft 不会在克隆、启动应用或打开项目列表时自动执行仓库命令。
 
-示例项目配置见 [`docs/samples/deepseek-harness.runloft.yaml`](docs/samples/deepseek-harness.runloft.yaml)。该样本仓库是未经安全审计的实验性开发预览；使用前请阅读其安全说明，并在隔离环境中运行。更多实现状态与平台限制见[推进计划](docs/ROADMAP.md)和[验证记录](docs/VALIDATION.md)。
+示例项目配置见 [`docs/samples/deepseek-harness.runloft.yaml`](docs/samples/deepseek-harness.runloft.yaml)，可从 RunLoft 的“配置项目”导入；配置会复制到应用数据中，不会写入 DeepSeek Harness 工作区。该样本仓库是未经安全审计的实验性开发预览；使用前请阅读其安全说明，并在隔离环境中运行。更多实现状态与平台限制见[推进计划](docs/ROADMAP.md)和[验证记录](docs/VALIDATION.md)。
 
 ## 问题与反馈
 

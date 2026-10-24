@@ -62,6 +62,10 @@ type app struct {
 	entryURL         string
 	updatePlan       *gitops.UpdatePlan
 	updatePlanID     string
+	configEditing    bool
+	configProjectID  string
+	configDraft      string
+	configDrafts     map[string]string
 }
 
 func main() {
@@ -198,6 +202,13 @@ func (a *app) sidebar(c *ui.Context) {
 					}
 					a.selected = project.ID
 					a.updatePlan = nil
+					if a.configEditing && a.configProjectID != project.ID {
+						if a.configDrafts == nil {
+							a.configDrafts = make(map[string]string)
+						}
+						a.configDrafts[a.configProjectID] = a.configDraft
+					}
+					a.configEditing = false
 					a.refreshStatus()
 					a.win.Invalidate()
 				}
@@ -216,6 +227,10 @@ func (a *app) content(c *ui.Context) {
 	t := c.Theme()
 	project, selected := a.selectedProject()
 	ui.Column(c).Grow(1).MinWidth(0).Gap(8).Children(func() {
+		if selected && a.configEditing && a.configProjectID == project.ID {
+			a.projectConfigEditor(c, project)
+			return
+		}
 		ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
 			if selected {
 				ui.Text(c, project.Name).FontSize(17).Bold().Grow(1)
@@ -224,6 +239,9 @@ func (a *app) content(c *ui.Context) {
 			}
 			if ui.Button(c, "刷新状态").Clicked() && selected && !a.busy {
 				a.refreshStatus()
+			}
+			if ui.Button(c, "配置项目").Clicked() && selected && !a.busy {
+				a.editProjectConfig(project)
 			}
 			if ui.Button(c, "查看配置与命令").Clicked() && selected && !a.busy {
 				go a.inspectConfig(project)
@@ -298,6 +316,103 @@ func (a *app) selectedProject() (workspace.Project, bool) {
 	return workspace.Project{}, false
 }
 
+func (a *app) editProjectConfig(project workspace.Project) {
+	if draft, ok := a.configDrafts[project.ID]; ok {
+		a.configDraft = draft
+	} else if config, ok := a.store.ProjectConfig(project.ID); ok {
+		a.configDraft = config
+	} else {
+		a.configDraft = fmt.Sprintf(`# RunLoft 将此配置保存在应用数据中，不会写入项目目录。
+# 填写项目实际支持的启动命令后保存。
+schemaVersion: 1
+project:
+  name: %q
+workingDirectory: .
+commands:
+  start:
+    argv: []
+server:
+  host: 127.0.0.1
+  port: 3080
+  healthPath: /
+`, project.Name)
+	}
+	a.configProjectID = project.ID
+	a.configEditing = true
+	a.win.Invalidate()
+}
+
+func (a *app) projectConfigEditor(c *ui.Context, project workspace.Project) {
+	t := c.Theme()
+	ui.Text(c, "项目运行配置").FontSize(17).Bold()
+	ui.Text(c, "配置由 RunLoft 管理并保存在应用数据中，不会写入项目源码仓库。").TextColor(t.TextMuted)
+	ui.TextArea(c, &a.configDraft).Grow(1).MinHeight(300).Border(1, t.Border)
+	ui.Row(c).Gap(8).Children(func() {
+		if ui.Button(c, "导入 YAML").Clicked() && !a.busy {
+			go a.importProjectConfig(project)
+		}
+		if ui.PrimaryButton(c, "保存配置").Clicked() && !a.busy {
+			a.saveProjectConfig(project)
+		}
+		if ui.Button(c, "取消").Clicked() {
+			a.configEditing = false
+			a.configDraft = ""
+			delete(a.configDrafts, project.ID)
+			a.win.Invalidate()
+		}
+	})
+}
+
+func (a *app) importProjectConfig(project workspace.Project) {
+	paths, err := mygo.Dialog.Open(mygo.OpenDialogOptions{
+		Parent: a.win, Title: "导入 RunLoft 项目配置", ButtonLabel: "导入",
+		Filters: []mygo.FileFilter{{Name: "YAML 配置", Extensions: []string{"yaml", "yml"}}},
+	})
+	if err != nil {
+		a.setStatus("选择配置失败：" + err.Error())
+		return
+	}
+	if len(paths) == 0 {
+		return
+	}
+	data, err := os.ReadFile(paths[0])
+	if err != nil {
+		a.setStatus("读取配置失败：" + err.Error())
+		return
+	}
+	if _, err := projectconfig.Decode(project.Path, data); err != nil {
+		a.setStatus("导入配置无效：" + err.Error())
+		return
+	}
+	mygo.RunOnMain(func() {
+		if a.configEditing && a.configProjectID == project.ID {
+			a.configDraft = string(data)
+			a.status = "配置已载入编辑器；保存后将由 RunLoft 管理。"
+			a.win.Invalidate()
+		}
+	})
+}
+
+func (a *app) saveProjectConfig(project workspace.Project) {
+	config, err := projectconfig.Decode(project.Path, []byte(a.configDraft))
+	if err != nil {
+		a.status = "配置校验失败：" + err.Error()
+		a.win.Invalidate()
+		return
+	}
+	if err := a.store.SetProjectConfig(project.ID, config.Project.Name, a.configDraft); err != nil {
+		a.status = "保存配置失败：" + err.Error()
+		a.win.Invalidate()
+		return
+	}
+	a.projects = a.store.List()
+	delete(a.configDrafts, project.ID)
+	a.configEditing = false
+	a.configDraft = ""
+	a.status = "项目配置已保存在 RunLoft 应用数据中。首次运行或配置变化时需要审查并授权。"
+	a.win.Invalidate()
+}
+
 func (a *app) chooseWorkspace() {
 	paths, err := mygo.Dialog.Open(mygo.OpenDialogOptions{Parent: a.win, Title: "选择克隆目录", Directory: true, ButtonLabel: "选择"})
 	if err != nil {
@@ -323,9 +438,6 @@ func (a *app) addLocalProject() {
 	}
 	root := paths[0]
 	name := filepath.Base(root)
-	if config, err := projectconfig.Load(root); err == nil {
-		name = config.Project.Name
-	}
 	remote := ""
 	if value, err := a.git.OriginURL(context.Background(), root); err == nil {
 		remote = value
@@ -466,7 +578,7 @@ func (a *app) inspectConfig(project workspace.Project) {
 	workingPath, _ := config.WorkingPath(project.Path)
 	var lines []string
 	lines = append(lines, "来源："+a.projectSource(project))
-	lines = append(lines, "配置：.runloft.yaml · schema v"+strconv.Itoa(config.SchemaVersion))
+	lines = append(lines, "配置：RunLoft 应用数据 · schema v"+strconv.Itoa(config.SchemaVersion))
 	lines = append(lines, "工作目录："+workingPath)
 	for _, check := range config.Runtime.Checks {
 		lines = append(lines, fmt.Sprintf("运行时：%s (%s %s)", check.Name, check.Command, check.Constraint))
@@ -580,16 +692,20 @@ func (a *app) stopProject() {
 }
 
 func (a *app) reviewConfig(project workspace.Project) (projectconfig.Config, string, error) {
-	config, err := projectconfig.Load(project.Path)
+	configYAML, ok := a.store.ProjectConfig(project.ID)
+	if !ok {
+		return projectconfig.Config{}, "", errors.New("该项目尚未配置；请先点击“配置项目”，导入或填写运行配置")
+	}
+	config, err := projectconfig.Decode(project.Path, []byte(configYAML))
 	if err != nil {
-		return projectconfig.Config{}, "", fmt.Errorf("读取项目配置失败：%w", err)
+		return projectconfig.Config{}, "", fmt.Errorf("读取 RunLoft 项目配置失败：%w", err)
 	}
 	repositoryStatus, err := a.git.Status(context.Background(), project.Path)
 	if err != nil {
 		return projectconfig.Config{}, "", fmt.Errorf("读取 Git 工作区状态失败：%w", err)
 	}
 	if !repositoryStatus.Clean() {
-		return projectconfig.Config{}, "", fmt.Errorf("工作区有 %d 项未提交改动；请先提交这些改动，再审查并运行项目", len(repositoryStatus.DirtyPaths))
+		return projectconfig.Config{}, "", fmt.Errorf("工作区有 %d 项未提交改动；请先提交或移除这些改动，再审查并运行项目", len(repositoryStatus.DirtyPaths))
 	}
 	repository := a.projectSource(project)
 	digest, err := config.ApprovalDigest(repository, repositoryStatus.Commit)

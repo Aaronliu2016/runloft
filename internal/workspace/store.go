@@ -27,6 +27,7 @@ type diskState struct {
 	Version        int               `json:"version"`
 	Projects       []Project         `json:"projects"`
 	ApprovedConfig map[string]string `json:"approvedConfig"`
+	ProjectConfigs map[string]string `json:"projectConfigs,omitempty"`
 }
 
 type Store struct {
@@ -46,7 +47,7 @@ func OpenStore(path string) (*Store, error) {
 	if err := os.MkdirAll(filepath.Dir(abs), 0o700); err != nil {
 		return nil, fmt.Errorf("create state directory: %w", err)
 	}
-	s := &Store{path: abs, data: diskState{Version: stateVersion, Projects: []Project{}, ApprovedConfig: map[string]string{}}}
+	s := &Store{path: abs, data: diskState{Version: stateVersion, Projects: []Project{}, ApprovedConfig: map[string]string{}, ProjectConfigs: map[string]string{}}}
 	bytes, err := os.ReadFile(abs)
 	if errors.Is(err, os.ErrNotExist) {
 		return s, nil
@@ -68,6 +69,9 @@ func OpenStore(path string) (*Store, error) {
 	}
 	if s.data.ApprovedConfig == nil {
 		s.data.ApprovedConfig = map[string]string{}
+	}
+	if s.data.ProjectConfigs == nil {
+		s.data.ProjectConfigs = map[string]string{}
 	}
 	for i := range s.data.Projects {
 		canonical, err := storedPath(s.data.Projects[i].Path)
@@ -146,15 +150,69 @@ func (s *Store) RemoveProject(id string) error {
 	for key, value := range s.data.ApprovedConfig {
 		oldApprovals[key] = value
 	}
+	oldConfigs := make(map[string]string, len(s.data.ProjectConfigs))
+	for key, value := range s.data.ProjectConfigs {
+		oldConfigs[key] = value
+	}
 	projects := append([]Project(nil), s.data.Projects...)
 	s.data.Projects = append(projects[:index], projects[index+1:]...)
 	delete(s.data.ApprovedConfig, id)
+	delete(s.data.ProjectConfigs, id)
 	if err := s.saveLocked(); err != nil {
 		s.data.Projects = oldProjects
 		s.data.ApprovedConfig = oldApprovals
+		s.data.ProjectConfigs = oldConfigs
 		return err
 	}
 	return nil
+}
+
+// SetProjectConfig stores the RunLoft-owned YAML without writing into the
+// project workspace. Callers validate it against the registered project first.
+func (s *Store) SetProjectConfig(id, name, config string) error {
+	if strings.TrimSpace(config) == "" {
+		return errors.New("project configuration is required")
+	}
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return errors.New("project name is required")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	index := -1
+	for i := range s.data.Projects {
+		if s.data.Projects[i].ID == id {
+			index = i
+			break
+		}
+	}
+	if index < 0 {
+		return errors.New("project is not registered")
+	}
+	oldName := s.data.Projects[index].Name
+	old, hadOld := s.data.ProjectConfigs[id]
+	s.data.Projects[index].Name = name
+	s.data.ProjectConfigs[id] = config
+	if err := s.saveLocked(); err != nil {
+		s.data.Projects[index].Name = oldName
+		if hadOld {
+			s.data.ProjectConfigs[id] = old
+		} else {
+			delete(s.data.ProjectConfigs, id)
+		}
+		return err
+	}
+	return nil
+}
+
+func (s *Store) ProjectConfig(id string) (string, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if !containsProject(s.data.Projects, id) {
+		return "", false
+	}
+	config, ok := s.data.ProjectConfigs[id]
+	return config, ok
 }
 
 func (s *Store) Approve(id, digest string) error {

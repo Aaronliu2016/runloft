@@ -21,7 +21,7 @@
 - 验证 HTTP/WebSocket、Cookie、前端路由、外链拦截和本地服务未就绪提示。
 - 从桌面应用启动和停止一个目标进程；验证关闭应用后的进程清理。
 - 验证系统 Git 对公开仓库的 clone、status、fetch 和安全快进更新。
-- 审阅 `.runloft.yaml` 草案、用户信任流程和固定端口方案；DeepSeek Harness 样本已固定到具体 commit 并审阅 `SAFETY.md`。仍须在两平台完成宿主机和 RunLoft 主应用闭环验证。
+- 审阅项目配置 schema、用户信任流程和固定端口方案；DeepSeek Harness 样本已固定到具体 commit 并审阅 `SAFETY.md`。仍须在两平台完成宿主机和 RunLoft 主应用闭环验证。
 - 按仓库 README 的源码流程验证 `pnpm install --frozen-lockfile`、`pnpm run build`、`pnpm dsh web`；根 `package.json` 声明 Node.js `>=24.9.0`、pnpm `11.28.5`。容器内实测源码入口为 `dsh web: http://127.0.0.1:<port>/?token=…`，`/` 的未授权响应为 401；配置样例显式绑定 loopback 并提取 token 入口 URL。该结果仅覆盖隔离容器，不代表宿主机两平台均已兼容。
 
 **交付物：** 技术验证记录、决策更新、Windows/macOS 首发支持矩阵和 MVP 验收用例。
@@ -50,11 +50,11 @@
 **工作项：**
 
 - 实现 Git clone、status、fetch 和经用户明确确认的仅快进更新。
-- 实现 `.runloft.yaml` schema 解析、版本拒绝和字段诊断。
+- 实现项目配置导入、编辑、应用内保存、schema 解析、版本拒绝和字段诊断。
 - 展示仓库来源、工作区状态、配置命令和配置摘要。
 - 实现命令预览、首次授权以及配置变化后的重新授权。
 
-**验收状态：** 已实现并有自动测试覆盖无效配置拒绝、配置授权摘要变化、脏工作区阻止更新以及过期更新计划拒绝。主 UI 交互仍需手动验收。
+**验收状态：** 已实现配置校验、应用内保存、配置授权摘要变化、脏工作区阻止执行/更新以及过期更新计划拒绝。RunLoft 配置不写入项目仓库；主 UI 交互仍需手动验收。
 
 ## P3：进程生命周期与服务呈现
 
